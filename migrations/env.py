@@ -8,11 +8,11 @@ from alembic import context
 # Import your models so Alembic detects them
 from app.features.auth.data.models.user_db import User  # noqa: F401
 from app.features.college.data.models import Batch, College, Department, UserScope  # noqa: F401
-from app.core.database.session import Base
+from app.core.database.session import Base, get_async_database_url
 from app.core.config.app_settings import settings
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", get_async_database_url(settings.DATABASE_URL))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
