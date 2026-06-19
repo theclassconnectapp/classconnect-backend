@@ -44,8 +44,10 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db() -> None:
-    """Local dev/test only. Production uses Alembic migrations."""
-    if getattr(settings, 'is_production', False) or getattr(settings, 'APP_ENV', '') == 'production':
+    import os
+    if os.environ.get('APP_ENV') == 'production':
+        return
+    if os.environ.get('IS_PRODUCTION', '').lower() == 'true':
         return
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

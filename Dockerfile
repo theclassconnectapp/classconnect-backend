@@ -9,6 +9,7 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . .
+RUN chmod +x scripts/start.sh
 
 # Non-root user for security
 RUN adduser --disabled-password --gecos "" appuser
@@ -17,4 +18,4 @@ USER appuser
 EXPOSE 8000
 
 # Use exec form — handles signals correctly (important for AWS ECS graceful shutdown)
-CMD ["uvicorn", "app.app_root:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["bash", "scripts/start.sh"]
