@@ -14,6 +14,7 @@ from app.core.errors.handlers import register_exception_handlers
 from app.features.auth.presentation.api.auth_router import router as auth_router
 # 👇 1. IMPORT YOUR NEW GEMINI ROUTER HERE
 from app.features.ai.presentation.api.ai_router import router as ai_router
+from app.features.college.presentation.api.college_router import router as college_router
 
 
 @asynccontextmanager
@@ -64,6 +65,7 @@ register_exception_handlers(app)
 
 # Routers
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(college_router, prefix="/api/v1")
 # 👇 2. MOUNT YOUR GEMINI ENGINE UNDER THE SAME API PREFIX
 app.include_router(ai_router, prefix="/api/v1")
 

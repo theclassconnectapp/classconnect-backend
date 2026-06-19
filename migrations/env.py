@@ -7,6 +7,7 @@ from alembic import context
 
 # Import your models so Alembic detects them
 from app.features.auth.data.models.user_db import User  # noqa: F401
+from app.features.college.data.models import Batch, College, Department, UserScope  # noqa: F401
 from app.core.database.session import Base
 from app.core.config.app_settings import settings
 

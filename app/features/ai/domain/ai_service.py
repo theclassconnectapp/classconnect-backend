@@ -1,3 +1,5 @@
+import asyncio
+
 from google import genai
 from google.genai import types
 from app.core.config.app_settings import settings
@@ -18,8 +20,8 @@ class AIService:
             "Keep your tone professional, adaptive, and highly direct. Avoid fluff."
         )
         try:
-            # Running synchronous SDK call inside an async wrapper or executing directly
-            response = self.client.models.generate_content(
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
                 model=self.model,
                 contents=user_prompt,
                 config=types.GenerateContentConfig(
