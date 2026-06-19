@@ -1,7 +1,7 @@
-"""initial schema: users, colleges, departments, batches, user_scopes
+"""college schema
 
-Revision ID: 7c0c5985f9c7
-Revises: 
+Revision ID: 0002_college_schema
+Revises: 0001_initial_users
 Create Date: 2026-06-20 00:00:03.114191
 """
 from typing import Sequence, Union
@@ -9,30 +9,13 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '7c0c5985f9c7'
-down_revision: Union[str, None] = None
+revision: str = '0002_college_schema'
+down_revision: Union[str, None] = '0001_initial_users'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table('users',
-    sa.Column('uid', sa.String(length=128), nullable=False),
-    sa.Column('name', sa.String(length=256), nullable=False),
-    sa.Column('email', sa.String(length=320), nullable=False),
-    sa.Column('role', sa.String(length=32), nullable=False),
-    sa.Column('dept', sa.String(length=128), nullable=True),
-    sa.Column('batch', sa.String(length=32), nullable=True),
-    sa.Column('photo_url', sa.String(length=1024), nullable=True),
-    sa.Column('fcm_token', sa.String(length=512), nullable=True),
-    sa.Column('college_id', sa.String(length=128), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.PrimaryKeyConstraint('uid'),
-    sa.UniqueConstraint('email')
-    )
-    op.create_index('ix_users_college_id', 'users', ['college_id'], unique=False)
-    op.create_index('ix_users_role', 'users', ['role'], unique=False)
     op.create_table('colleges',
     sa.Column('id', sa.String(length=128), nullable=False),
     sa.Column('name', sa.String(length=256), nullable=False),
@@ -111,6 +94,3 @@ def downgrade() -> None:
     op.drop_table('departments')
     op.drop_index('ix_colleges_active', table_name='colleges')
     op.drop_table('colleges')
-    op.drop_index('ix_users_role', table_name='users')
-    op.drop_index('ix_users_college_id', table_name='users')
-    op.drop_table('users')
