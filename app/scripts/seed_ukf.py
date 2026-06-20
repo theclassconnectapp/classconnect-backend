@@ -1,5 +1,11 @@
 import asyncio
+import json
+import os
+from dataclasses import dataclass
+from uuid import UUID
 
+import firebase_admin
+from firebase_admin import credentials, firestore
 from sqlalchemy import select
 
 from app.core.database.session import AsyncSessionLocal
@@ -19,11 +25,63 @@ UKF_DEPARTMENTS = [
 ]
 
 
+@dataclass(frozen=True)
+class BatchInfo:
+    department_id: UUID
+    batch_id: UUID
+    label: str
+
+
+def _get_firebase_app():
+    try:
+        return firebase_admin.get_app()
+    except ValueError:
+        service_account_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+        if not service_account_json:
+            return None
+        service_account_info = json.loads(service_account_json)
+        credential = credentials.Certificate(service_account_info)
+        return firebase_admin.initialize_app(credential)
+
+
+def create_general_groups(batch_infos: list[BatchInfo]) -> int:
+    app = _get_firebase_app()
+    if app is None:
+        print("Warning: FIREBASE_SERVICE_ACCOUNT_JSON is not set; skipping Firestore general group creation")
+        return 0
+
+    db = firestore.client(app=app)
+    created_count = 0
+    for batch_info in batch_infos:
+        group_id = f"{batch_info.batch_id}_general"
+        group_ref = db.document(f"colleges/ukf/groups/{group_id}")
+        if group_ref.get().exists:
+            continue
+
+        group_ref.set(
+            {
+                "id": group_id,
+                "name": "General",
+                "description": f"General group for {batch_info.label}",
+                "collegeId": "ukf",
+                "departmentId": str(batch_info.department_id),
+                "batchId": str(batch_info.batch_id),
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "isGeneral": True,
+                "archived": False,
+                "members": [],
+            }
+        )
+        created_count += 1
+    return created_count
+
+
 async def main() -> None:
     async with AsyncSessionLocal() as db:
         created_college = False
         created_departments = 0
         seeded_batches = 0
+        batch_infos: list[BatchInfo] = []
 
         result = await db.execute(select(College).where(College.id == "ukf"))
         college = result.scalar_one_or_none()
@@ -61,11 +119,21 @@ async def main() -> None:
                 batches = await seed_batches_for_department(db, department_id, start_year=2022, count=5)
                 seeded_batches += len(batches)
 
+            result = await db.execute(select(Batch).where(Batch.department_id == department_id))
+            department_batches = result.scalars().all()
+            batch_infos.extend(
+                BatchInfo(department_id=department_id, batch_id=batch.id, label=batch.label)
+                for batch in department_batches
+            )
+
+        general_groups_created = create_general_groups(batch_infos)
+
         print(
             "UKF seed complete: "
             f"college_created={created_college}, "
             f"departments_created={created_departments}, "
-            f"batches_created={seeded_batches}"
+            f"batches_created={seeded_batches}, "
+            f"general_groups_created={general_groups_created}"
         )
 
 
