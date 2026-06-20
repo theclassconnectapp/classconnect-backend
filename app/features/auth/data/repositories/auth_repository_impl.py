@@ -21,6 +21,34 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 async def get_or_create_user(
     db: AsyncSession,
+    uid: str,
+    name: str,
+    email: str,
+) -> User:
+    user = await get_user(db, uid)
+    if user is not None:
+        return user
+
+    user = User(
+        uid=uid,
+        name=name,
+        email=email,
+        role="student",
+    )
+    db.add(user)
+    try:
+        await db.commit()
+        await db.refresh(user)
+        logger.info("user_created", uid=user.uid, email=user.email)
+    except IntegrityError:
+        # Race condition: another request created the user between get and insert
+        await db.rollback()
+        user = await get_user(db, uid)
+    return user
+
+
+async def get_or_create_google_user(
+    db: AsyncSession,
     google_data: dict,
     college_id: str | None,
 ) -> tuple[User, bool]:
@@ -32,23 +60,16 @@ async def get_or_create_user(
     if user is not None:
         return user, False
 
-    user = User(
-        uid=google_data["uid"],
-        name=google_data.get("name", ""),
-        email=google_data.get("email", ""),
-        photo_url=google_data.get("photo_url"),
-        role="student",
-        college_id=college_id,
+    user = await get_or_create_user(
+        db,
+        google_data["uid"],
+        google_data.get("name", ""),
+        google_data.get("email", ""),
     )
-    db.add(user)
-    try:
-        await db.commit()
-        await db.refresh(user)
-        logger.info("user_created", uid=user.uid, email=user.email)
-    except IntegrityError:
-        # Race condition: another request created the user between get and insert
-        await db.rollback()
-        user = await get_user(db, google_data["uid"])
+    user.photo_url = google_data.get("photo_url")
+    user.college_id = college_id
+    await db.commit()
+    await db.refresh(user)
     return user, True
 
 

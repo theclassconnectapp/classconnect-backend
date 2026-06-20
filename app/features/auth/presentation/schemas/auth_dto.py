@@ -84,3 +84,19 @@ class FcmTokenRequest(BaseModel):
         if not v.strip():
             raise ValueError("FCM token cannot be empty")
         return v
+
+
+class VerifyRoleCodeRequest(BaseModel):
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def code_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("code cannot be empty")
+        return v
+
+
+class VerifyRoleCodeResponse(BaseModel):
+    valid: bool
+    role: Optional[str] = None

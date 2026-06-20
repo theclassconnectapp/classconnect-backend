@@ -1,8 +1,8 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.security.firebase_auth import verify_firebase_token
-from app.features.auth.data.repositories.auth_repository_impl import get_user
+from app.core.security.firebase_auth import decode_firebase_token, verify_firebase_token
+from app.features.auth.data.repositories.auth_repository_impl import get_or_create_user, get_user
 from app.core.database.session import get_db
 from app.features.auth.data.models.user_db import User
 
@@ -28,8 +28,17 @@ async def get_current_user(
         )
     user = await get_user(db, uid)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "USER_NOT_FOUND", "message": "User not found"},
+        decoded_token = decode_firebase_token(credentials.credentials)
+        if not decoded_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "INVALID_TOKEN", "message": "Invalid or expired access token"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        user = await get_or_create_user(
+            db,
+            uid,
+            decoded_token.get("name", ""),
+            decoded_token.get("email", ""),
         )
     return user

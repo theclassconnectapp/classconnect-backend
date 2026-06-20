@@ -5,7 +5,7 @@ Output: JWT tokens + AppUser
 Mirrors: AuthRemoteDataSource.signInWithGoogle()
 """
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.features.auth.data.repositories.auth_repository_impl import get_or_create_user
+from app.features.auth.data.repositories.auth_repository_impl import get_or_create_google_user
 from app.core.security.jwt_handler import create_access_token, create_refresh_token
 from app.features.auth.presentation.schemas.auth_dto import TokenResponse, AppUserSchema
 from app.features.auth.data.models.user_db import User
@@ -25,7 +25,7 @@ async def execute(
     college_id: str | None,
 ) -> tuple[TokenResponse, bool]:
     """Returns (TokenResponse, is_new_user)."""
-    user, is_new = await get_or_create_user(db, google_data, college_id)
+    user, is_new = await get_or_create_google_user(db, google_data, college_id)
     token_response = TokenResponse(
         access_token=create_access_token(user.uid),
         refresh_token=create_refresh_token(user.uid),

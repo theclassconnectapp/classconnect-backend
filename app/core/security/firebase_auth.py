@@ -15,11 +15,17 @@ def _get_firebase_app():
         return firebase_admin.initialize_app(credential)
 
 
-def verify_firebase_token(token: str) -> str | None:
+def decode_firebase_token(token: str) -> dict | None:
     try:
         _get_firebase_app()
-        decoded_token = auth.verify_id_token(token)
-        uid = decoded_token.get("uid")
-        return uid if isinstance(uid, str) else None
+        return auth.verify_id_token(token)
     except Exception:
         return None
+
+
+def verify_firebase_token(token: str) -> str | None:
+    decoded_token = decode_firebase_token(token)
+    if not decoded_token:
+        return None
+    uid = decoded_token.get("uid")
+    return uid if isinstance(uid, str) else None

@@ -7,11 +7,12 @@ from app.core.database.session import get_db
 from app.features.auth.presentation.schemas.auth_dto import (
     GoogleAuthRequest, TokenResponse, RefreshRequest,
     AppUserSchema, SaveUserRequest, FcmTokenRequest,
+    VerifyRoleCodeRequest, VerifyRoleCodeResponse,
 )
 from app.features.auth.data.repositories.auth_repository_impl import (
     get_user, save_user, save_fcm_token,
 )
-from app.features.auth.domain.usecases import login_with_google
+from app.features.auth.domain.usecases import login_with_google, verify_role_code
 from app.features.auth.domain.usecases.login_with_google import user_to_schema
 from app.core.security.jwt_handler import (
     create_access_token, create_refresh_token, verify_token,
@@ -102,6 +103,17 @@ async def refresh_tokens(
         refresh_token=create_refresh_token(uid),
         user=user_to_schema(user),
     )
+
+
+@router.post(
+    "/verify-role-code",
+    response_model=VerifyRoleCodeResponse,
+    summary="Verify role invite code",
+    description="Returns the role associated with a valid advisor/HOD invite code.",
+)
+async def verify_role_invite_code(req: VerifyRoleCodeRequest):
+    role = verify_role_code.execute(req.code)
+    return VerifyRoleCodeResponse(valid=role is not None, role=role)
 
 
 @router.get(
