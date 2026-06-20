@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from app.features.auth.data.models.user_db import User
 from app.features.auth.presentation.schemas.auth_dto import SaveUserRequest
@@ -99,6 +99,19 @@ async def save_user(db: AsyncSession, req: SaveUserRequest) -> User:
     await db.commit()
     await db.refresh(user)
     logger.info("user_saved", uid=user.uid, role=user.role)
+    return user
+
+
+async def update_user_role(db: AsyncSession, uid: str, role: str) -> User | None:
+    await db.execute(
+        update(User)
+        .where(User.uid == uid)
+        .values(role=role, updated_at=func.now())
+    )
+    await db.commit()
+    user = await get_user(db, uid)
+    if user is not None:
+        logger.info("user_role_updated", uid=user.uid, role=user.role)
     return user
 
 

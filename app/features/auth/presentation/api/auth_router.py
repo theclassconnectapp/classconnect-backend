@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -10,14 +11,14 @@ from app.features.auth.presentation.schemas.auth_dto import (
     VerifyRoleCodeRequest, VerifyRoleCodeResponse,
 )
 from app.features.auth.data.repositories.auth_repository_impl import (
-    get_user, save_user, save_fcm_token,
+    get_user, save_user, save_fcm_token, update_user_role,
 )
 from app.features.auth.domain.usecases import login_with_google, verify_role_code
 from app.features.auth.domain.usecases.login_with_google import user_to_schema
 from app.core.security.jwt_handler import (
     create_access_token, create_refresh_token, verify_token,
 )
-from app.features.auth.presentation.dependencies import get_current_user
+from app.features.auth.presentation.dependencies import bearer_scheme, get_current_user
 from app.features.auth.data.models.user_db import User
 from app.core.config.app_settings import settings
 
@@ -28,6 +29,15 @@ import structlog
 logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+async def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    if credentials is None:
+        return None
+    return await get_current_user(credentials, db)
 
 
 def _verify_google_token(token: str) -> dict:
@@ -111,8 +121,14 @@ async def refresh_tokens(
     summary="Verify role invite code",
     description="Returns the role associated with a valid advisor/HOD invite code.",
 )
-async def verify_role_invite_code(req: VerifyRoleCodeRequest):
+async def verify_role_invite_code(
+    req: VerifyRoleCodeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     role = verify_role_code.execute(req.code)
+    if role is not None and current_user is not None:
+        await update_user_role(db, current_user.uid, role)
     return VerifyRoleCodeResponse(valid=role is not None, role=role)
 
 

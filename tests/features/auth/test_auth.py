@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.features.auth.data.models.user_db import User
 from app.features.auth.data.repositories.auth_repository_impl import get_user
 from app.features.auth.presentation import dependencies as auth_dependencies
 
@@ -36,6 +37,37 @@ async def test_verify_role_code_endpoint_exists(client: AsyncClient):
     r = await client.post("/api/v1/auth/verify-role-code", json={"code": "UNKNOWN"})
     assert r.status_code == 200
     assert r.json() == {"valid": False, "role": None}
+
+
+@pytest.mark.asyncio
+async def test_verify_role_code_updates_authenticated_user_role(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    db_session.add(
+        User(
+            uid="staff-uid",
+            name="Staff User",
+            email="staff@example.com",
+            role="student",
+        )
+    )
+    await db_session.commit()
+    monkeypatch.setattr(auth_dependencies, "verify_firebase_token", lambda token: "staff-uid")
+
+    r = await client.post(
+        "/api/v1/auth/verify-role-code",
+        json={"code": "TEACH2025"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert r.status_code == 200
+    assert r.json() == {"valid": True, "role": "subjectTeacher"}
+
+    user = await get_user(db_session, "staff-uid")
+    assert user is not None
+    assert user.role == "subjectTeacher"
 
 
 @pytest.mark.asyncio

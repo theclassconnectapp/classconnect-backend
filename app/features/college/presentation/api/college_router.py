@@ -140,7 +140,7 @@ async def assign_staff_scope_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "PERMISSION_DENIED", "message": "Cannot modify another user"},
         )
-    if current_user.role not in ("hod", "subjectTeacher"):
+    if current_user.role not in ("hod", "subjectTeacher", "advisor"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "PERMISSION_DENIED", "message": "Only staff users can assign staff scopes"},
