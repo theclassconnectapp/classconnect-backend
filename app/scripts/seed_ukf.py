@@ -28,6 +28,7 @@ UKF_DEPARTMENTS = [
 @dataclass(frozen=True)
 class BatchInfo:
     department_id: UUID
+    department_name: str
     batch_id: UUID
     label: str
 
@@ -51,12 +52,14 @@ def create_general_groups(batch_infos: list[BatchInfo]) -> int:
         return 0
 
     db = firestore.client(app=app)
+    groups_ref = db.collection("colleges/ukf/groups")
+    for doc in groups_ref.where("isGeneral", "==", True).stream():
+        doc.reference.delete()
+
     created_count = 0
     for batch_info in batch_infos:
         group_id = f"{batch_info.batch_id}_general"
-        group_ref = db.document(f"colleges/ukf/groups/{group_id}")
-        if group_ref.get().exists:
-            continue
+        group_ref = groups_ref.document(group_id)
 
         group_ref.set(
             {
@@ -64,6 +67,8 @@ def create_general_groups(batch_infos: list[BatchInfo]) -> int:
                 "name": "General",
                 "description": f"General group for {batch_info.label}",
                 "collegeId": "ukf",
+                "dept": batch_info.department_name,
+                "batch": batch_info.label,
                 "departmentId": str(batch_info.department_id),
                 "batchId": str(batch_info.batch_id),
                 "createdAt": firestore.SERVER_TIMESTAMP,
@@ -122,7 +127,12 @@ async def main() -> None:
             result = await db.execute(select(Batch).where(Batch.department_id == department_id))
             department_batches = result.scalars().all()
             batch_infos.extend(
-                BatchInfo(department_id=department_id, batch_id=batch.id, label=batch.label)
+                BatchInfo(
+                    department_id=department_id,
+                    department_name=item["name"],
+                    batch_id=batch.id,
+                    label=batch.label,
+                )
                 for batch in department_batches
             )
 
