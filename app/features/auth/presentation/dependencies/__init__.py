@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.security.jwt_handler import verify_token
+from app.core.security.firebase_auth import verify_firebase_token
 from app.features.auth.data.repositories.auth_repository_impl import get_user
 from app.core.database.session import get_db
 from app.features.auth.data.models.user_db import User
@@ -19,7 +19,7 @@ async def get_current_user(
             detail={"code": "MISSING_TOKEN", "message": "Authorization header required"},
             headers={"WWW-Authenticate": "Bearer"},
         )
-    uid = verify_token(credentials.credentials, token_type="access")
+    uid = verify_firebase_token(credentials.credentials)
     if not uid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
