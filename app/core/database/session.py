@@ -32,6 +32,12 @@ class Base(DeclarativeBase):
     pass
 
 
+# Import models so Base.metadata includes all tables for Alembic and init_db.
+from app.features.auth.data.models.user_db import User  # noqa: E402,F401
+from app.features.college.data.models import Batch, College, Department, UserScope  # noqa: E402,F401
+from app.features.ai.data.models.ai_usage_db import AiUsage  # noqa: E402,F401
+
+
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         try:

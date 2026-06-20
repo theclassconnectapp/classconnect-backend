@@ -5,9 +5,6 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
-# Import your models so Alembic detects them
-from app.features.auth.data.models.user_db import User  # noqa: F401
-from app.features.college.data.models import Batch, College, Department, UserScope  # noqa: F401
 from app.core.database.session import Base, get_async_database_url
 from app.core.config.app_settings import settings
 
