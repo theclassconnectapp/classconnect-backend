@@ -54,13 +54,17 @@ def create_general_groups(batch_infos: list[BatchInfo]) -> int:
 
     db = firestore.client(app=app)
     groups_ref = db.collection("colleges/ukf/groups")
-    for doc in groups_ref.where("isGeneral", "==", True).stream():
-        doc.reference.delete()
 
     created_count = 0
     for batch_info in batch_infos:
         group_id = f"{batch_info.batch_id}_general"
         group_ref = groups_ref.document(group_id)
+
+        # Only create missing General groups. Existing groups may already have
+        # real members/messages, so this seed path must never delete or replace them.
+        existing = group_ref.get()
+        if existing.exists:
+            continue
 
         group_ref.set(
             {
@@ -144,7 +148,7 @@ async def main() -> None:
             f"college_created={created_college}, "
             f"departments_created={created_departments}, "
             f"batches_created={seeded_batches}, "
-            f"general_groups_created={general_groups_created}"
+            f"general_groups_newly_created={general_groups_created}"
         )
 
 
