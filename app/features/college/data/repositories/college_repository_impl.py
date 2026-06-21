@@ -255,6 +255,19 @@ async def assign_staff_scope(
     return _scope_to_entity(scope)
 
 
+async def remove_staff_scope(db: AsyncSession, uid: str, scope_id: UUID) -> None:
+    result = await db.execute(select(UserScope).where(UserScope.id == scope_id))
+    scope = result.scalar_one_or_none()
+    if scope is None:
+        raise ValueError("scope not found")
+    if scope.uid != uid:
+        raise ValueError("not authorized to remove this scope")
+
+    await db.delete(scope)
+    await db.commit()
+    logger.info("staff_scope_removed", uid=uid, scope_id=str(scope_id))
+
+
 async def get_user_scopes(db: AsyncSession, uid: str) -> UserScopesResult:
     user = await _get_user(db, uid)
     if user.role in ("student", "advisor"):

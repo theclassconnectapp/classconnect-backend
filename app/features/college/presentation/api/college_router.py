@@ -13,7 +13,12 @@ from app.features.college.data.repositories.college_repository_impl import (
     list_batches,
     list_departments,
 )
-from app.features.college.domain.usecases import assign_staff_scope, assign_student_scope, get_user_scopes
+from app.features.college.domain.usecases import (
+    assign_staff_scope,
+    assign_student_scope,
+    get_user_scopes,
+    remove_staff_scope,
+)
 from app.features.college.presentation.schemas.college_dto import (
     AssignStaffScopeRequest,
     AssignStudentScopeRequest,
@@ -155,6 +160,30 @@ async def assign_staff_scope_endpoint(
         )
     except ValueError as exc:
         raise _bad_request(str(exc))
+
+
+@router.delete(
+    "/scopes/{scope_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a staff scope",
+)
+async def remove_staff_scope_endpoint(
+    scope_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        await remove_staff_scope.execute(db, current_user.uid, scope_id)
+    except ValueError as exc:
+        if "not authorized" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "PERMISSION_DENIED", "message": str(exc)},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "SCOPE_NOT_FOUND", "message": str(exc)},
+        )
 
 
 @router.get(
