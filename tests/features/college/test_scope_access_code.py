@@ -73,6 +73,105 @@ async def test_assign_student_scope_allows_matching_or_unrestricted_access_code(
 
 
 @pytest.mark.asyncio
+async def test_assign_student_scope_creates_general_group_when_missing(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    user, department, batch = await _seed_scope_models(db_session, role="student")
+    firestore_client = FakeFirestoreClient()
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_JSON", "{}")
+    monkeypatch.setattr(college_repository_impl, "_get_firebase_app", lambda: object())
+    monkeypatch.setattr(college_repository_impl.firestore, "client", lambda app: firestore_client)
+    monkeypatch.setattr(college_repository_impl, "_get_college_access_code", lambda college_id: None)
+
+    await college_repository_impl.assign_student_scope(
+        db_session,
+        user.uid,
+        "ukf",
+        None,
+        department.id,
+        batch.id,
+    )
+
+    group_ref = firestore_client.collection("colleges/ukf/groups").document(f"{batch.id}_general")
+    assert group_ref.set_count == 1
+    assert group_ref.data == {
+        "id": f"{batch.id}_general",
+        "name": "General",
+        "description": f"General group for {batch.label}",
+        "collegeId": "ukf",
+        "dept": department.name,
+        "batch": batch.label,
+        "departmentId": str(department.id),
+        "batchId": str(batch.id),
+        "createdAt": college_repository_impl.firestore.SERVER_TIMESTAMP,
+        "isGeneral": True,
+        "archived": False,
+        "members": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_assign_student_scope_does_not_create_duplicate_general_group(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    user, department, batch = await _seed_scope_models(db_session, role="student")
+    firestore_client = FakeFirestoreClient()
+    group_ref = firestore_client.collection("colleges/ukf/groups").document(f"{batch.id}_general")
+    existing_data = {
+        "id": f"{batch.id}_general",
+        "name": "General With Activity",
+        "members": ["student-1"],
+    }
+    group_ref.data = existing_data.copy()
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_JSON", "{}")
+    monkeypatch.setattr(college_repository_impl, "_get_firebase_app", lambda: object())
+    monkeypatch.setattr(college_repository_impl.firestore, "client", lambda app: firestore_client)
+    monkeypatch.setattr(college_repository_impl, "_get_college_access_code", lambda college_id: None)
+
+    await college_repository_impl.assign_student_scope(
+        db_session,
+        user.uid,
+        "ukf",
+        None,
+        department.id,
+        batch.id,
+    )
+
+    assert group_ref.set_count == 0
+    assert group_ref.data == existing_data
+
+
+@pytest.mark.asyncio
+async def test_assign_student_scope_ignores_general_group_firestore_failure(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    user, department, batch = await _seed_scope_models(db_session, role="student")
+    firestore_client = FakeFirestoreClient(fail_on_get=True)
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_JSON", "{}")
+    monkeypatch.setattr(college_repository_impl, "_get_firebase_app", lambda: object())
+    monkeypatch.setattr(college_repository_impl.firestore, "client", lambda app: firestore_client)
+    monkeypatch.setattr(college_repository_impl, "_get_college_access_code", lambda college_id: None)
+
+    scope = await college_repository_impl.assign_student_scope(
+        db_session,
+        user.uid,
+        "ukf",
+        None,
+        department.id,
+        batch.id,
+    )
+
+    assert scope.uid == user.uid
+    assert scope.department_id == department.id
+    await db_session.refresh(user)
+    assert user.department_id == department.id
+    assert user.batch_id == batch.id
+
+
+@pytest.mark.asyncio
 async def test_assign_staff_scope_rejects_invalid_access_code(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
@@ -229,3 +328,46 @@ async def _seed_scope_models(
     await db_session.refresh(department)
     await db_session.refresh(batch)
     return user, department, batch
+
+
+class FakeFirestoreClient:
+    def __init__(self, fail_on_get: bool = False):
+        self.collections = {}
+        self.fail_on_get = fail_on_get
+
+    def collection(self, path):
+        if path not in self.collections:
+            self.collections[path] = FakeCollectionReference(self.fail_on_get)
+        return self.collections[path]
+
+
+class FakeCollectionReference:
+    def __init__(self, fail_on_get: bool):
+        self.documents = {}
+        self.fail_on_get = fail_on_get
+
+    def document(self, document_id):
+        if document_id not in self.documents:
+            self.documents[document_id] = FakeDocumentReference(self.fail_on_get)
+        return self.documents[document_id]
+
+
+class FakeDocumentReference:
+    def __init__(self, fail_on_get: bool):
+        self.data = None
+        self.set_count = 0
+        self.fail_on_get = fail_on_get
+
+    def get(self):
+        if self.fail_on_get:
+            raise RuntimeError("firestore unavailable")
+        return FakeDocumentSnapshot(exists=self.data is not None)
+
+    def set(self, data):
+        self.data = data.copy()
+        self.set_count += 1
+
+
+class FakeDocumentSnapshot:
+    def __init__(self, exists):
+        self.exists = exists

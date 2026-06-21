@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Optional
 from uuid import UUID
 
@@ -220,6 +221,70 @@ async def _validate_college_access_code(college_id: str, access_code: Optional[s
         raise ValueError("invalid access code")
 
 
+def _ensure_general_group_exists_sync(
+    college_id: str,
+    department_id: UUID,
+    batch_id: UUID | None,
+    department_name: str,
+    batch_label: str | None,
+) -> None:
+    if not os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"):
+        return
+
+    group_id = f"{batch_id}_general" if batch_id else f"{department_id}_general"
+    group_label = batch_label or department_name
+    app = _get_firebase_app()
+    db = firestore.client(app=app)
+    group_ref = db.collection(f"colleges/{college_id}/groups").document(group_id)
+
+    existing = group_ref.get()
+    if existing.exists:
+        return
+
+    group_ref.set(
+        {
+            "id": group_id,
+            "name": "General",
+            "description": f"General group for {group_label}",
+            "collegeId": college_id,
+            "dept": department_name,
+            "batch": batch_label or "",
+            "departmentId": str(department_id),
+            "batchId": str(batch_id) if batch_id else None,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "isGeneral": True,
+            "archived": False,
+            "members": [],
+        }
+    )
+
+
+async def _ensure_general_group_exists(
+    college_id: str,
+    department_id: UUID,
+    batch_id: UUID | None,
+    department_name: str,
+    batch_label: str | None,
+) -> None:
+    try:
+        await asyncio.to_thread(
+            _ensure_general_group_exists_sync,
+            college_id,
+            department_id,
+            batch_id,
+            department_name,
+            batch_label,
+        )
+    except Exception as exc:
+        logger.warning(
+            "general_group_ensure_failed",
+            college_id=college_id,
+            department_id=str(department_id),
+            batch_id=str(batch_id) if batch_id else None,
+            exc_info=exc,
+        )
+
+
 async def assign_student_scope(
     db: AsyncSession,
     uid: str,
@@ -244,6 +309,13 @@ async def assign_student_scope(
     user.batch = batch.label
     await db.commit()
     await db.refresh(user)
+    await _ensure_general_group_exists(
+        college_id,
+        department_id,
+        batch_id,
+        department.name,
+        batch.label,
+    )
     logger.info("student_scope_assigned", uid=uid, department_id=str(department_id), batch_id=str(batch_id))
     return UserScopeEntity(
         id=None,
@@ -264,7 +336,7 @@ async def assign_staff_scope(
 ) -> UserScopeEntity:
     await _get_user(db, uid)
     await _validate_college_access_code(college_id, access_code)
-    await _validate_scope(db, college_id, department_id, batch_id)
+    department, batch = await _validate_scope(db, college_id, department_id, batch_id)
 
     scope = UserScope(
         uid=uid,
@@ -275,6 +347,13 @@ async def assign_staff_scope(
     db.add(scope)
     await db.commit()
     await db.refresh(scope)
+    await _ensure_general_group_exists(
+        college_id,
+        department_id,
+        batch_id,
+        department.name,
+        batch.label if batch else None,
+    )
     logger.info("staff_scope_assigned", uid=uid, department_id=str(department_id), batch_id=str(batch_id))
     return _scope_to_entity(scope)
 
