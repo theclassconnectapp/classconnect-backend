@@ -72,6 +72,7 @@ class CreateDepartmentRequest(BaseModel):
 class AssignStudentScopeRequest(BaseModel):
     uid: str
     college_id: str
+    access_code: Optional[str] = None
     department_id: UUID
     batch_id: UUID
 
@@ -86,6 +87,7 @@ class AssignStudentScopeRequest(BaseModel):
 class AssignStaffScopeRequest(BaseModel):
     uid: str
     college_id: str
+    access_code: Optional[str] = None
     department_id: UUID
     batch_id: Optional[UUID] = None
 

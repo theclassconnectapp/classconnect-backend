@@ -45,6 +45,7 @@ class ICollegeRepository(ABC):
         self,
         uid: str,
         college_id: str,
+        access_code: Optional[str],
         department_id: UUID,
         batch_id: UUID,
     ) -> UserScope: ...
@@ -54,6 +55,7 @@ class ICollegeRepository(ABC):
         self,
         uid: str,
         college_id: str,
+        access_code: Optional[str],
         department_id: UUID,
         batch_id: Optional[UUID] = None,
     ) -> UserScope: ...

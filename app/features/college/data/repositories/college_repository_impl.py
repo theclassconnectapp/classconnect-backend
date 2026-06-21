@@ -1,11 +1,14 @@
+import asyncio
 from typing import Optional
 from uuid import UUID
 
 import structlog
+from firebase_admin import firestore
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security.firebase_auth import _get_firebase_app
 from app.features.auth.data.models.user_db import User
 from app.features.college.data.models.college_db import Batch, College, Department
 from app.features.college.data.models.user_scope_db import UserScope
@@ -200,10 +203,28 @@ async def _validate_scope(
     return department, batch
 
 
+def _get_college_access_code(college_id: str) -> str | None:
+    app = _get_firebase_app()
+    db = firestore.client(app=app)
+    snapshot = db.collection("colleges").document(college_id).get()
+    if not snapshot.exists:
+        return None
+
+    access_code = (snapshot.to_dict() or {}).get("accessCode")
+    return access_code if isinstance(access_code, str) else None
+
+
+async def _validate_college_access_code(college_id: str, access_code: Optional[str]) -> None:
+    required_access_code = await asyncio.to_thread(_get_college_access_code, college_id)
+    if required_access_code is not None and required_access_code != access_code:
+        raise ValueError("invalid access code")
+
+
 async def assign_student_scope(
     db: AsyncSession,
     uid: str,
     college_id: str,
+    access_code: Optional[str],
     department_id: UUID,
     batch_id: UUID,
 ) -> UserScopeEntity:
@@ -211,6 +232,7 @@ async def assign_student_scope(
     if user.department_id is not None:
         raise ValueError("Student scope is immutable once assigned")
 
+    await _validate_college_access_code(college_id, access_code)
     department, batch = await _validate_scope(db, college_id, department_id, batch_id)
     if batch is None:
         raise ValueError("Batch is required for student scope")
@@ -236,10 +258,12 @@ async def assign_staff_scope(
     db: AsyncSession,
     uid: str,
     college_id: str,
+    access_code: Optional[str],
     department_id: UUID,
     batch_id: Optional[UUID] = None,
 ) -> UserScopeEntity:
     await _get_user(db, uid)
+    await _validate_college_access_code(college_id, access_code)
     await _validate_scope(db, college_id, department_id, batch_id)
 
     scope = UserScope(

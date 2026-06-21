@@ -22,6 +22,7 @@ UKF_DEPARTMENTS = [
     {"slug": "eee", "name": "Electrical and Electronics", "code": "EEE"},
     {"slug": "me", "name": "Mechanical Engineering", "code": "ME"},
     {"slug": "ce", "name": "Civil Engineering", "code": "CE"},
+    {"slug": "cys", "name": "Cyber Security", "code": "CYS"},
 ]
 
 

@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +17,8 @@ async def execute(
     db: AsyncSession,
     uid: str,
     college_id: str,
+    access_code: Optional[str],
     department_id: UUID,
     batch_id: UUID,
 ) -> UserScope:
-    return await assign_student_scope_repo(db, uid, college_id, department_id, batch_id)
+    return await assign_student_scope_repo(db, uid, college_id, access_code, department_id, batch_id)

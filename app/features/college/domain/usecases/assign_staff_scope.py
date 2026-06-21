@@ -13,7 +13,8 @@ async def execute(
     db: AsyncSession,
     uid: str,
     college_id: str,
+    access_code: Optional[str],
     department_id: UUID,
     batch_id: Optional[UUID] = None,
 ) -> UserScope:
-    return await assign_staff_scope_repo(db, uid, college_id, department_id, batch_id)
+    return await assign_staff_scope_repo(db, uid, college_id, access_code, department_id, batch_id)

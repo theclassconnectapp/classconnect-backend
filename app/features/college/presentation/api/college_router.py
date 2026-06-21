@@ -40,6 +40,13 @@ def _bad_request(message: str) -> HTTPException:
     )
 
 
+def _invalid_access_code(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"code": "INVALID_ACCESS_CODE", "message": message},
+    )
+
+
 @router.get(
     "/colleges/{college_id}/departments",
     response_model=list[DepartmentSchema],
@@ -118,10 +125,13 @@ async def assign_student_scope_endpoint(
             db,
             req.uid,
             req.college_id,
+            req.access_code,
             req.department_id,
             req.batch_id,
         )
     except ValueError as exc:
+        if str(exc) == "invalid access code":
+            raise _invalid_access_code(str(exc))
         if "immutable" in str(exc):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -155,10 +165,13 @@ async def assign_staff_scope_endpoint(
             db,
             req.uid,
             req.college_id,
+            req.access_code,
             req.department_id,
             req.batch_id,
         )
     except ValueError as exc:
+        if str(exc) == "invalid access code":
+            raise _invalid_access_code(str(exc))
         raise _bad_request(str(exc))
 
 
