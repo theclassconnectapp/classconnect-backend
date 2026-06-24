@@ -48,6 +48,9 @@ async def send_notification(
                 "token": fcm_token,
                 "notification": {"title": title, "body": body},
                 "data": {k: str(v) for k, v in data.items()},
+                "android": {
+                    "priority": "high",
+                },
             }
         }
         async with httpx.AsyncClient() as client:
